@@ -1,0 +1,288 @@
+---
+title: "MCBS"
+author: "Anna Daccache"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r}
+install.packages("survey")
+install.packages("dplyr")
+install.packages("tidyr")
+install.packages("janitor")
+```
+<br />
+
+Dataset is from the [Medicare Current Beneficiary Survey COVID-19 2020 Fall Supplement PUF](https://www.cms.gov/research-statistics-data-and-systems/downloadable-public-use-files/mcbs-public-use-file).
+
+#### Dual Status and Telemedicine
+
+```{r}
+library("survey")
+library(dplyr)
+
+
+df = readr::read_csv("COVIDPUF_2_2020F.csv")
+
+
+df = df %>%
+  mutate(tele_med = case_when(ACV_TELMED == "1" ~ "_Yes",
+                                ACV_TELMED == "2" ~ "_No",
+                                ACV_TELMED == "D" ~ "_DK"),
+         dual_var = case_when(DMV_H_OPMDCD == 1 ~ "Dual",
+                                  DMV_H_OPMDCD == 2 ~ "Non_Dual",
+                                  DMV_H_OPMDCD == 3 ~ "Partial",
+                                  DMV_H_OPMDCD == 4 ~ "QMB_Only"),
+         dual_var = factor(dual_var, levels = c("Dual", "Non_Dual", "Partial", "QMB_Only")))
+
+```
+<br />
+
+##### Replicate Weights
+
+```{r}
+
+mcbs <- svrepdesign(
+  weights = ~CPWFWGT,
+  repweights = "CPWF[001-100]+",
+  type = "Fay",
+  rho = 0.3,
+  data = df,
+  combined.weights = TRUE
+)
+
+```
+
+<br />
+
+##### Comparing different dual status groups to examine provider's TM use.
+
+```{r}
+duals <- svyby(~tele_med, ~dual_var, mcbs, svymean, na.rm = TRUE, na.rm.all = TRUE)
+print(duals)
+```
+
+```{r}
+barplot(duals, main="Telemedicine Provision by Dual Status",
+        xlab="Dual Status",
+        ylab="Percent",
+        col=c("darkblue", "lightblue", "blue"),
+        legend = c("Don't Know", "No", "Yes"),
+        args.legend = list(x = "bottomleft",
+                           inset = c(-0.13, -0.32)))
+
+```
+<br />
+
+#### Combining Duals Status groups vs NonDuals
+
+Looking at Dual, Partial, and QMB against Non Duals.
+
+```{r}
+df1 = df %>%
+  mutate(tele_med = case_when(ACV_TELMED == "1" ~ "_Yes",
+                                ACV_TELMED == "2" ~ "_No"),
+         dual_var = case_when(DMV_H_OPMDCD == 1 & 3 & 4 ~ "Combined_Dual",
+                                  DMV_H_OPMDCD == 2 ~ "Non_Dual"),
+         dual_var = factor(dual_var, levels = c("Combined_Dual", "Non_Dual")))
+```
+
+##### Replicate Weights
+
+```{r}
+
+mcbs <- svrepdesign(
+  weights = ~CPWFWGT,
+  repweights = "CPWF[001-100]+",
+  type = "Fay",
+  rho = 0.3,
+  data = df1,
+  combined.weights = TRUE
+)
+
+```
+
+```{r}
+duals_combo <- svyby(~tele_med, ~dual_var, mcbs, svymean, na.rm = TRUE, na.rm.all = TRUE)
+print(duals_combo)
+```
+```{r}
+barplot(duals_combo, main="Telemedicine Provision by Dual Status",
+        xlab="Dual Status",
+        ylab="Percent",
+        col=c("darkblue", "lightblue"),
+        legend = c("No", "Yes"),
+        args.legend = list(x = "bottomleft",
+                           inset = c(-0.13, -0.32)))
+
+```
+
+<br />
+
+#### Gender and Telemedicine 
+
+```{r}
+df2 = df %>%
+  mutate(tele_med = case_when(ACV_TELMED == "1" ~ "_Yes",
+                                ACV_TELMED == "2" ~ "_No",
+                                ACV_TELMED == "D" ~ "_DK"),
+         gender = case_when(DMV_SEX == 1 ~ "Male",
+                                  DMV_SEX == 2 ~ "Female"),
+         gender = factor(gender, levels = c("Male", "Female")))
+```
+
+<br />
+
+##### Replicate Weights
+
+```{r}
+
+mcbs <- svrepdesign(
+  weights = ~CPWFWGT,
+  repweights = "CPWF[001-100]+",
+  type = "Fay",
+  rho = 0.3,
+  data = df2,
+  combined.weights = TRUE
+)
+
+```
+
+<br />
+
+##### Examining TM status by gender.
+
+```{r}
+genderTM <- svyby(~tele_med, ~gender, mcbs, svymean, na.rm = TRUE, na.rm.all = TRUE)
+print(genderTM)
+```
+
+```{r}
+barplot(genderTM, main="Telemedicine Provision by Gender",
+        xlab="Gender",
+        ylab="Percent",
+        col=c("darkblue", "lightblue", "blue"),
+        legend = c("Don't Know", "No", "Yes"),
+        args.legend = list(x = "bottomleft",
+                           inset = c(-0.13, -0.32)))
+
+```
+<br />
+
+#### Race and Telemedicine 
+
+```{r}
+df3 = df %>%
+  mutate(tele_med = case_when(ACV_TELMED == "1" ~ "_Yes",
+                                ACV_TELMED == "2" ~ "_No",
+                                ACV_TELMED == "D" ~ "_DK"),
+         race = case_when(DMV_RACE == 1 ~ "White (nh)",
+                                  DMV_RACE == 2 ~ "Black (nh)",
+                                  DMV_RACE == 3 ~ "Hispanic",
+                                  DMV_RACE == 4 ~ "Other"),
+         race = factor(race, levels = c("White (nh)", "Black (nh)", "Hispanic", "Other")))
+```
+
+<br />
+
+##### Replicate Weights
+
+```{r}
+
+mcbs <- svrepdesign(
+  weights = ~CPWFWGT,
+  repweights = "CPWF[001-100]+",
+  type = "Fay",
+  rho = 0.3,
+  data = df3,
+  combined.weights = TRUE
+)
+
+```
+
+<br />
+
+##### Examining TM status by race.
+
+```{r}
+raceTM <- svyby(~tele_med, ~race, mcbs, svymean, na.rm = TRUE, na.rm.all = TRUE)
+print(raceTM)
+```
+
+```{r}
+barplot(raceTM, main="Telemedicine Provision by Race",
+        xlab="Race",
+        ylab="Percent",
+        col=c("darkblue", "lightblue", "blue"),
+        legend = c("Don't Know", "No", "Yes"),
+        args.legend = list(x = "topright",
+                           inset = c(-0.05, 0.32)))
+
+```
+
+<br />
+
+#### Race and Dual Status 
+
+```{r}
+df4 = df %>%
+  mutate(race = case_when(DMV_RACE == 1 ~ "White (nh)",
+                                  DMV_RACE == 2 ~ "Black (nh)",
+                                  DMV_RACE == 3 ~ "Hispanic",
+                                  DMV_RACE == 4 ~ "Other"),
+        dual_var = case_when(DMV_H_OPMDCD == 1 ~ "Dual",
+                                  DMV_H_OPMDCD == 2 ~ "Non_Dual",
+                                  DMV_H_OPMDCD == 3 ~ "Partial",
+                                  DMV_H_OPMDCD == 4 ~ "QMB_Only"),
+         dual_var = factor(dual_var, levels = c("Dual", "Non_Dual", "Partial", "QMB_Only")))
+```
+
+<br />
+
+##### Replicate Weights
+
+```{r}
+
+mcbs <- svrepdesign(
+  weights = ~CPWFWGT,
+  repweights = "CPWF[001-100]+",
+  type = "Fay",
+  rho = 0.3,
+  data = df4,
+  combined.weights = TRUE
+)
+
+```
+
+<br />
+
+##### Examining Dual status by race.
+
+```{r}
+raceTM <- svyby(~race, ~dual_var, mcbs, svymean, na.rm = TRUE, na.rm.all = TRUE)
+print(raceTM)
+```
+
+```{r}
+barplot(raceTM, main="Dual Status by Race",
+        xlab="Dual Status",
+        ylab="Percent",
+        col=c("darkblue", "lightblue", "blue", "white"),
+        legend = c("Black", "White", "Hispanic", "Other"),
+        args.legend = list(x = "topright",
+                           inset = c(-0.05, 0)))
+
+```
+
+
+
+
+
+
+
+
